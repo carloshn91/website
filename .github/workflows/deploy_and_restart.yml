@@ -1,0 +1,48 @@
+name: 'Kubernetes: Deploy and Rollout'
+on:
+  workflow_run:
+    workflows: ["Docker: Build and Push"]
+    branches: [main]
+    types: [completed]
+
+jobs:
+  kustomize_apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Configure AWS Credentials                          
+        uses: aws-actions/configure-aws-credentials@v1           
+        with:                                                    
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Kustomize Apply
+        uses: kodermax/kubectl-aws-eks@master                                                                         
+        env:
+          KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}                                                                                                        
+        with:                                                                                                         
+          args: -n website apply -k infrastructure/kubernetes/stg/.
+
+  deploy_front:
+    needs: kustomize_apply
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Configure AWS Credentials                          
+        uses: aws-actions/configure-aws-credentials@v1           
+        with:                                                    
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Commit Short Hash
+        id: vars
+        run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+      - name: Deploy to Kubernetes Service Frontend                                                                       
+        uses: kodermax/kubectl-aws-eks@master                                                                       
+        env:            
+          KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}                                                                                              
+          RELEASE_IMAGE_FRONTEND: carloshn/website-${{ steps.vars.outputs.sha_short }}
+        with:                                                                                                         
+          args: set image deployment/website website=$RELEASE_IMAGE_FRONTEND --record -n website
