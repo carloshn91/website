@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: website
+  namespace: website
+  labels:
+    env: stg
+spec:
+  selector:
+    matchLabels:
+      env: stg
+  template:
+    metadata:
+      labels:
+        env: stg
+    spec:
+      containers:
+      - name: website
+        resources:
+          requests:
+            cpu: 0.1
+            memory: 64Mi
+          limits:
+            cpu: 0.3
+            memory: 256Mi
+      
